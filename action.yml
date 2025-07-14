@@ -60,6 +60,10 @@ inputs:
     description: "Custom environment variables to pass to Claude Code execution (YAML format)"
     required: false
     default: ""
+  enable_inline_comments:
+    description: "Enable Claude to post inline comments on specific lines during PR reviews"
+    required: false
+    default: "false"
 
   # Auth configuration
   anthropic_api_key:
@@ -141,6 +145,7 @@ runs:
         ACTIONS_TOKEN: ${{ github.token }}
         ADDITIONAL_PERMISSIONS: ${{ inputs.additional_permissions }}
         USE_COMMIT_SIGNING: ${{ inputs.use_commit_signing }}
+        ENABLE_INLINE_COMMENTS: ${{ inputs.enable_inline_comments }}
 
     - name: Run Claude Code
       id: claude-code

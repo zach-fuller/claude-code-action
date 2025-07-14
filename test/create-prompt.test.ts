@@ -650,6 +650,72 @@ describe("generatePrompt", () => {
     // Should not have git command instructions
     expect(prompt).not.toContain("Use git commands via the Bash tool");
   });
+
+  test("should include inline comment instructions when enableInlineComments is true for PR events", () => {
+    const envVars: PreparedContext = {
+      repository: "owner/repo",
+      claudeCommentId: "12345",
+      triggerPhrase: "@claude",
+      eventData: {
+        eventName: "pull_request_review",
+        isPR: true,
+        prNumber: "456",
+        commentBody: "@claude please review this PR",
+      },
+    };
+
+    const prompt = generatePrompt(envVars, mockGitHubData, false, true);
+
+    // Should include inline comment instructions
+    expect(prompt).toContain("INLINE COMMENTS: You have access to GitHub's inline comment tools");
+    expect(prompt).toContain("mcp__github__create_pending_pull_request_review");
+    expect(prompt).toContain("mcp__github__add_pull_request_review_comment_to_pending_review");
+    expect(prompt).toContain("mcp__github__submit_pending_pull_request_review");
+    expect(prompt).toContain("mcp__github__get_pull_request_diff");
+    expect(prompt).toContain("prefer inline comments on specific lines over general comments");
+  });
+
+  test("should not include inline comment instructions when enableInlineComments is false", () => {
+    const envVars: PreparedContext = {
+      repository: "owner/repo",
+      claudeCommentId: "12345",
+      triggerPhrase: "@claude",
+      eventData: {
+        eventName: "pull_request_review",
+        isPR: true,
+        prNumber: "456",
+        commentBody: "@claude please review this PR",
+      },
+    };
+
+    const prompt = generatePrompt(envVars, mockGitHubData, false, false);
+
+    // Should NOT include inline comment instructions
+    expect(prompt).not.toContain("INLINE COMMENTS: You have access to GitHub's inline comment tools");
+    expect(prompt).not.toContain("prefer inline comments on specific lines over general comments");
+  });
+
+  test("should not include inline comment instructions for non-PR events even when enableInlineComments is true", () => {
+    const envVars: PreparedContext = {
+      repository: "owner/repo",
+      claudeCommentId: "12345",
+      triggerPhrase: "@claude",
+      eventData: {
+        eventName: "issue_comment",
+        isPR: false,
+        issueNumber: "123",
+        commentBody: "@claude please help",
+        baseBranch: "main",
+        claudeBranch: "claude/issue-123",
+      },
+    };
+
+    const prompt = generatePrompt(envVars, mockGitHubData, false, true);
+
+    // Should NOT include inline comment instructions for non-PR events
+    expect(prompt).not.toContain("INLINE COMMENTS: You have access to GitHub's inline comment tools");
+    expect(prompt).not.toContain("prefer inline comments on specific lines over general comments");
+  });
 });
 
 describe("getEventTypeAndContext", () => {
@@ -884,6 +950,45 @@ describe("buildAllowedToolsString", () => {
     // Commit signing tools should NOT be included
     expect(result).not.toContain("mcp__github_file_ops__commit_files");
     expect(result).not.toContain("mcp__github_file_ops__delete_files");
+  });
+
+  test("should include inline comment tools when enableInlineComments is true", () => {
+    const result = buildAllowedToolsString([], false, false, true);
+
+    // Base tools should be present
+    expect(result).toContain("Edit");
+    expect(result).toContain("Glob");
+    expect(result).toContain("Grep");
+    expect(result).toContain("LS");
+    expect(result).toContain("Read");
+    expect(result).toContain("Write");
+
+    // Inline comment tools should be included
+    expect(result).toContain("mcp__github__create_pending_pull_request_review");
+    expect(result).toContain("mcp__github__add_pull_request_review_comment_to_pending_review");
+    expect(result).toContain("mcp__github__submit_pending_pull_request_review");
+    expect(result).toContain("mcp__github__get_pull_request_diff");
+
+    // Comment tool should always be included
+    expect(result).toContain("mcp__github_comment__update_claude_comment");
+  });
+
+  test("should not include inline comment tools when enableInlineComments is false", () => {
+    const result = buildAllowedToolsString([], false, false, false);
+
+    // Base tools should be present
+    expect(result).toContain("Edit");
+    expect(result).toContain("Glob");
+    expect(result).toContain("Grep");
+
+    // Inline comment tools should NOT be included
+    expect(result).not.toContain("mcp__github__create_pending_pull_request_review");
+    expect(result).not.toContain("mcp__github__add_pull_request_review_comment_to_pending_review");
+    expect(result).not.toContain("mcp__github__submit_pending_pull_request_review");
+    expect(result).not.toContain("mcp__github__get_pull_request_diff");
+
+    // Comment tool should always be included
+    expect(result).toContain("mcp__github_comment__update_claude_comment");
   });
 
   test("should handle all combinations of options", () => {

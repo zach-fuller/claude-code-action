@@ -37,6 +37,7 @@ export function buildAllowedToolsString(
   customAllowedTools?: string[],
   includeActionsTools: boolean = false,
   useCommitSigning: boolean = false,
+  enableInlineComments: boolean = false,
 ): string {
   let baseTools = [...BASE_ALLOWED_TOOLS];
 
@@ -70,6 +71,16 @@ export function buildAllowedToolsString(
       "mcp__github_ci__get_ci_status",
       "mcp__github_ci__get_workflow_run_details",
       "mcp__github_ci__download_job_log",
+    );
+  }
+
+  // Add inline comment tools if enabled
+  if (enableInlineComments) {
+    baseTools.push(
+      "mcp__github__create_pending_pull_request_review",
+      "mcp__github__add_pull_request_review_comment_to_pending_review",
+      "mcp__github__submit_pending_pull_request_review",
+      "mcp__github__get_pull_request_diff",
     );
   }
 
@@ -464,6 +475,7 @@ export function generatePrompt(
   context: PreparedContext,
   githubData: FetchDataResult,
   useCommitSigning: boolean,
+  enableInlineComments: boolean = false,
 ): string {
   const {
     contextData,
@@ -608,7 +620,14 @@ ${context.directPrompt ? `   - DIRECT INSTRUCTION: A direct instruction was prov
       - Formulate a concise, technical, and helpful response based on the context.
       - Reference specific code with inline formatting or code blocks.
       - Include relevant file paths and line numbers when applicable.
-      - ${eventData.isPR ? `IMPORTANT: Submit your review feedback by updating the Claude comment using mcp__github_comment__update_claude_comment. This will be displayed as your PR review.` : `Remember that this feedback must be posted to the GitHub comment using mcp__github_comment__update_claude_comment.`}
+      - ${eventData.isPR ? `IMPORTANT: Submit your review feedback by updating the Claude comment using mcp__github_comment__update_claude_comment. This will be displayed as your PR review.` : `Remember that this feedback must be posted to the GitHub comment using mcp__github_comment__update_claude_comment.`}${eventData.isPR && enableInlineComments ? `
+      - INLINE COMMENTS: You have access to GitHub's inline comment tools for PR reviews:
+        * Use mcp__github__create_pending_pull_request_review to start a new review
+        * Use mcp__github__add_pull_request_review_comment_to_pending_review to add comments on specific lines of code
+        * Use mcp__github__submit_pending_pull_request_review to submit your review with all inline comments
+        * Use mcp__github__get_pull_request_diff to see the exact changes and identify specific lines to comment on
+        * When providing code review feedback, prefer inline comments on specific lines over general comments
+        * Each inline comment should be specific, actionable, and reference the exact code being discussed` : ""}
 
    B. For Straightforward Changes:
       - Use file system tools to make the change locally.
@@ -745,6 +764,7 @@ export async function createPrompt(
       preparedContext,
       githubData,
       context.inputs.useCommitSigning,
+      context.inputs.enableInlineComments,
     );
 
     // Log the final prompt to console
@@ -766,6 +786,7 @@ export async function createPrompt(
       context.inputs.allowedTools,
       hasActionsReadPermission,
       context.inputs.useCommitSigning,
+      context.inputs.enableInlineComments,
     );
     const allDisallowedTools = buildDisallowedToolsString(
       context.inputs.disallowedTools,
